@@ -1,23 +1,30 @@
 #![no_std]
 #![no_main]
 
+mod vga_buffer;
+mod ports;
+mod video;
+
 use core::panic::PanicInfo;
+
+use crate::{ports::tst, video::video_tmp};
+
 #[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
+fn panic(info: &PanicInfo) -> ! {
+    eprintln!("Kernel {}", info);
     loop { /* unrecoverable panic attack */ }
 }
 
-static BUONGIORNO: &[u8] = b"Buongiorno";
+
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
-    let vga_buf = 0xb8000 as *mut u8; // address
-    for (i, &byte) in BUONGIORNO.iter().enumerate() {
-        unsafe {
-            // C says hi
-            *vga_buf.offset(i as isize * 2) = byte;
-            *vga_buf.offset(i as isize * 2 + 1) = 0xb;
-        }
-    }
+
+    println!("hi");
+    println!("!!!");
+    tst();
+
+    // video_tmp()
+
     loop { /* nothing */ }
 }
