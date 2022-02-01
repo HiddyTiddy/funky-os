@@ -12,6 +12,7 @@ $ # install qemu
 $ brew install qemu # mac with homebrew
 $ sudo pacman -S qemu # arch
 
+$ cargo install bootimage
 $ rustup update nightly # maybe
 
 $ make
