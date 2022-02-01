@@ -7,8 +7,9 @@ use volatile::Volatile;
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         column_position: 0,
-        color_code: ColorCode::new(Color::Green, Color::Black),
+        color_code: ColorCode::new(Color::White, Color::Black),
         buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+        default_color: ColorCode::new(Color::White, Color::Black),
     });
 }
 
@@ -41,6 +42,18 @@ impl ColorCode {
     fn new(foreground: Color, background: Color) -> Self {
         ColorCode((background as u8) << 4 | (foreground as u8))
     }
+
+    fn with_foreground(&self, foreground: Color) -> Self {
+        let bg = self.0 & 0xf0;
+        let val = bg | (foreground as u8);
+        ColorCode(val)
+    }
+
+    fn with_background(&self, background: Color) -> Self {
+        let fg = self.0 & 0x0f;
+        let val = fg | ((background as u8) << 4);
+        ColorCode(val)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -61,11 +74,11 @@ struct Buffer {
 pub struct Writer {
     column_position: usize,
     color_code: ColorCode,
+    default_color: ColorCode,
     buffer: &'static mut Buffer,
 }
 
 impl Writer {
-
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
@@ -90,8 +103,6 @@ impl Writer {
             for col in 0..BUFFER_WIDTH {
                 let ch = self.buffer.chars[row][col].read();
                 self.buffer.chars[row - 1][col].write(ch);
-
-
             }
         }
         self.clear_row(BUFFER_HEIGHT - 1);
@@ -111,12 +122,121 @@ impl Writer {
     fn set_color(&mut self, color_code: ColorCode) {
         self.color_code = color_code;
     }
+
+    fn reset_color(&mut self) {
+        self.color_code = self.default_color;
+    }
+
+    fn process_ansi(&mut self, bytes: &mut core::str::Bytes) {
+        if let Some(next) = bytes.next() {
+            if next != b'[' {
+                self.write_byte(next);
+                return;
+            }
+        } else {
+            return;
+        }
+        const BUF_SIZE: usize = 3;
+        let mut buf: [u8; BUF_SIZE] = [0; BUF_SIZE];
+        let mut index = 0;
+        let mut valid = false;
+        while let Some(next) = bytes.next() {
+            if (b'0'..=b'9').contains(&next) && index < buf.len() {
+                buf[index] = next - b'0';
+            } else if next == b'm' {
+                // next is not numeric || index == buf.len()
+                valid = true;
+                break;
+            } else {
+                // next is not numeric || index == buf.len() && next != ';'
+                self.write_byte(b'[');
+                for i in 0..index {
+                    self.write_byte(buf[i] + b'0');
+                }
+                self.write_byte(next);
+                return;
+            }
+            index += 1;
+        }
+
+        if !valid {
+            self.write_byte(b'[');
+            for i in 0..index {
+                self.write_byte(buf[i] + b'0');
+            }
+            return;
+        }
+
+        let mut num = 0;
+        let mut factor = 1;
+        for (i, j) in buf.iter().rev().enumerate() {
+            if i < BUF_SIZE - index {
+                continue;
+            }
+            num += *j * factor;
+            factor = factor.overflowing_mul(10).0;
+        }
+
+        match num {
+            0 => self.set_color(self.default_color),
+            30 => self.set_color(self.color_code.with_foreground(Color::Black)),
+            31 => self.set_color(self.color_code.with_foreground(Color::Red)),
+            32 => self.set_color(self.color_code.with_foreground(Color::Green)),
+            33 => self.set_color(self.color_code.with_foreground(Color::Yellow)),
+            34 => self.set_color(self.color_code.with_foreground(Color::Blue)),
+            35 => self.set_color(self.color_code.with_foreground(Color::Magenta)),
+            36 => self.set_color(self.color_code.with_foreground(Color::Cyan)),
+            37 => self.set_color(self.color_code.with_foreground(Color::White)),
+            90 => self.set_color(self.color_code.with_foreground(Color::LightGray)),
+            91 => self.set_color(self.color_code.with_foreground(Color::LightRed)),
+            92 => self.set_color(self.color_code.with_foreground(Color::LightGreen)),
+            93 => self.set_color(self.color_code.with_foreground(Color::Yellow)),
+            94 => self.set_color(self.color_code.with_foreground(Color::LightBlue)),
+            95 => self.set_color(self.color_code.with_foreground(Color::Magenta)),
+            96 => self.set_color(self.color_code.with_foreground(Color::LightCyan)),
+            97 => self.set_color(self.color_code.with_foreground(Color::White)),
+            40 => self.set_color(self.color_code.with_background(Color::Black)),
+            41 => self.set_color(self.color_code.with_background(Color::Red)),
+            42 => self.set_color(self.color_code.with_background(Color::Green)),
+            43 => self.set_color(self.color_code.with_background(Color::Yellow)),
+            44 => self.set_color(self.color_code.with_background(Color::Blue)),
+            45 => self.set_color(self.color_code.with_background(Color::Magenta)),
+            46 => self.set_color(self.color_code.with_background(Color::Cyan)),
+            47 => self.set_color(self.color_code.with_background(Color::White)),
+            100 => self.set_color(self.color_code.with_background(Color::LightGray)),
+            101 => self.set_color(self.color_code.with_background(Color::LightRed)),
+            102 => self.set_color(self.color_code.with_background(Color::LightGreen)),
+            103 => self.set_color(self.color_code.with_background(Color::Yellow)),
+            104 => self.set_color(self.color_code.with_background(Color::LightBlue)),
+            105 => self.set_color(self.color_code.with_background(Color::Magenta)),
+            106 => self.set_color(self.color_code.with_background(Color::LightCyan)),
+            107 => self.set_color(self.color_code.with_background(Color::White)),
+            _ => self.write_byte(b'x'),
+        }
+    }
+
+    fn itos(&mut self, mut num: u8) {
+        let mut buf = [0; 3];
+        let mut i = 2;
+        while num != 0 {
+            buf[i] = num % 10;
+            num /= 10;
+            i = i.overflowing_sub(1).0;
+        }
+        for i in buf {
+            self.write_byte(i + b'0');
+        }
+    }
 }
 
 impl Write for Writer {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        for byte in s.bytes() {
+        let mut bytes = s.bytes().into_iter();
+        while let Some(byte) = bytes.next() {
             match byte {
+                0x1b => {
+                    self.process_ansi(&mut bytes);
+                }
                 0x20..=0x7e | b'\n' => self.write_byte(byte),
                 _ => self.write_byte(b'?'),
             }
@@ -145,9 +265,11 @@ pub fn _print(args: Arguments) {
 
 #[doc(hidden)]
 pub fn _eprint(args: Arguments) {
-    WRITER.lock().set_color(ColorCode::new(Color::Red, Color::Black));
+    WRITER
+        .lock()
+        .set_color(ColorCode::new(Color::Red, Color::Black));
     WRITER.lock().write_fmt(args).unwrap();
-    WRITER.lock().set_color(ColorCode::new(Color::Green, Color::Black));
+    WRITER.lock().reset_color();
 }
 
 #[macro_export]
