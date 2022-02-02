@@ -1,6 +1,11 @@
 #![no_std]
 #![no_main]
+
+// nightly stuff
 #![feature(custom_test_frameworks)]
+#![feature(abi_x86_interrupt)]
+
+
 #![test_runner(crate::test_runner)]
 #[cfg(test)]
 fn test_runner(tests: &[&dyn Fn()]) {
@@ -14,6 +19,7 @@ mod vga_buffer;
 // mod ports;
 // mod video;
 mod utils;
+mod interrupts;
 
 use core::panic::PanicInfo;
 
@@ -48,6 +54,11 @@ println!("97m  \x1b[97m \x1b[97m\x1b[40m ... \x1b[0m   \x1b[97m\x1b[41m ... \x1b
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
+
+    // init
+    interrupts::init_idt();
+    x86_64::instructions::interrupts::int3();
+
     println!("hi");
     println!("!!!");
     //tst();
@@ -55,6 +66,10 @@ pub extern "C" fn _start() -> ! {
     println!("{}", str_to_int(&[b'0', b'0', b'5']));
 
     color_test();
+    unsafe {
+        *(0xcafebabe as *mut u64) = 42
+    };
+    println!("still alive");
 
     // video_tmp()
 
