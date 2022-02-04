@@ -25,5 +25,5 @@ $ make
 - elf?
 - networking?
 - shell?
-
+- [write interrupt table](https://os.phil-opp.com/edition-1/extra/naked-exceptions/)
 
