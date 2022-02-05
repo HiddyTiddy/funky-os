@@ -6,3 +6,6 @@ build-std-features = ["compiler-builtins-mem"]
 target = "x86_64-funky_os.json"
 # rustflags = ["-C", "link-args=-Ttext 0x1000 bin/kernel_entry.o --oformat binary"]
 # rustflags = ["-C", "link-args=-Ttext 0x100 bin/kernel_entry.o"]
+
+[target.'cfg(target_os = "none")']
+runner = "bootimage runner"
