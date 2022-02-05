@@ -1,4 +1,5 @@
 CURR_ID := $(shell id -u)
+QEMU_FLAGS := -serial stdio
 
 RELEASE = 0
 
@@ -8,9 +9,9 @@ all: bootimage
 	# cat bin/bs.bin target/x86_64-funky_os/release/os > bin/os.bin
 	# qemu-system-x86_64 bin/os.bin
 ifeq ($(RELEASE), 1)
-	qemu-system-x86_64 target/x86_64-funky_os/release/bootimage-os.bin
+	qemu-system-x86_64 target/x86_64-funky_os/release/bootimage-os.bin $(QEMU_FLAGS)
 else
-	qemu-system-x86_64 target/x86_64-funky_os/debug/bootimage-os.bin
+	qemu-system-x86_64 target/x86_64-funky_os/debug/bootimage-os.bin $(QEMU_FLAGS)
 endif
 
 
