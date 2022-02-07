@@ -12,24 +12,21 @@ fn trivial_assertion() {
 }
 
 use core::panic::PanicInfo;
-use os::ports::{port_byte_in, port_byte_out};
-use os::{eprintln, interrupts, println, serial_println};
-
+use os::{eprintln, hlt_loop, println, serial_println};
 
 // use crate::ports::tst;
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     eprintln!("Kernel {}", info);
-    loop { /* unrecoverable panic attack */ }
+    hlt_loop();
+
+    /* unrecoverable panic attack */
 }
-
-
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
     // init
-    interrupts::init_idt();
-    //x86_64::instructions::interrupts::int3();
+    os::init();
 
     // println!("hi");
     // println!("!!!");
@@ -37,11 +34,7 @@ pub extern "C" fn _start() -> ! {
     // println!("{}", str_to_int(&[b'1', b'0', b'5']));
     // println!("{}", str_to_int(&[b'0', b'0', b'5']));
 
-    fn lol_die() {
-        lol_die();
-    }
-    //lol_die();
-    println!("lol");
+    println!("evolve to crab.");
     serial_println!("hello to host");
     // port_byte_out(port+3, 0x80);
 
@@ -54,10 +47,10 @@ pub extern "C" fn _start() -> ! {
 
     // port_byte_out(port, b'h');
 
-    // os::color_test();
+    os::color_test();
     // println!("still alive");
 
     // video_tmp()
 
-    loop { /* nothing */ }
+    hlt_loop();
 }
