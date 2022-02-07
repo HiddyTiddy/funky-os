@@ -5,13 +5,32 @@
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
-pub mod vga_buffer;
 pub mod ports;
 pub mod serial;
+pub mod vga_buffer;
 // pub mod video;
 pub mod gdt;
 pub mod interrupts;
+pub mod pic;
 pub mod utils;
+pub mod layouts;
+pub mod segmentation;
+
+/// initializes the kernel
+pub fn init() {
+    #[cfg(not(release))]
+    serial_println!("initializing kernel");
+
+    interrupts::init_idt();
+    gdt::init();
+    unsafe {
+        interrupts::PICS.lock().initialize();
+    }
+
+    x86_64::instructions::interrupts::enable();
+}
+
+/// prints a (for now static) color test
 pub fn color_test() {
     println!("       40m     41m     42m     43m     44m     45m     46m     47m     ");
     println!("30m  \x1b[30m \x1b[30m\x1b[40m ... \x1b[0m   \x1b[30m\x1b[41m ... \x1b[0m   \x1b[30m\x1b[42m ... \x1b[0m   \x1b[30m\x1b[43m ... \x1b[0m   \x1b[30m\x1b[44m ... \x1b[0m   \x1b[30m\x1b[45m ... \x1b[0m   \x1b[30m\x1b[46m ... \x1b[0m   \x1b[30m\x1b[47m ... \x1b[0m   ");
@@ -32,11 +51,20 @@ pub fn color_test() {
     println!("97m  \x1b[97m \x1b[97m\x1b[40m ... \x1b[0m   \x1b[97m\x1b[41m ... \x1b[0m   \x1b[97m\x1b[42m ... \x1b[0m   \x1b[97m\x1b[43m ... \x1b[0m   \x1b[97m\x1b[44m ... \x1b[0m   \x1b[97m\x1b[45m ... \x1b[0m   \x1b[97m\x1b[46m ... \x1b[0m   \x1b[97m\x1b[47m ... \x1b[0m   ");
 }
 
-pub trait Testable {
-    fn run(&self) -> ();
+pub fn hlt_loop() -> ! {
+    loop {
+        x86_64::instructions::hlt();
+    }
 }
 
-impl<T> Testable for T where T: Fn() {
+pub trait Testable {
+    fn run(&self);
+}
+
+impl<T> Testable for T
+where
+    T: Fn(),
+{
     fn run(&self) {
         // todo serial println
         println!("{}...\t", core::any::type_name::<T>());
@@ -65,7 +93,7 @@ pub fn test_panic_handler(info: &core::panic::PanicInfo) -> ! {
     serial_println!("[failed]\n");
     serial_println!("Error: {}\n", info);
     exit_qemu(QemuExitCode::Failed);
-    loop {}
+    hlt_loop();
 }
 
 pub fn exit_qemu(exit_code: QemuExitCode) {
@@ -83,7 +111,7 @@ pub fn exit_qemu(exit_code: QemuExitCode) {
 pub extern "C" fn _start() -> ! {
     // init();
     test_main();
-    loop {}
+    hlt_loop();
 }
 
 #[cfg(test)]
@@ -91,4 +119,3 @@ pub extern "C" fn _start() -> ! {
 fn panic(info: &core::panic::PanicInfo) -> ! {
     test_panic_handler(info)
 }
-
