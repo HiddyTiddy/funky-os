@@ -140,7 +140,7 @@ impl Writer {
         let mut buf: [u8; BUF_SIZE] = [0; BUF_SIZE];
         let mut index = 0;
         let mut valid = false;
-        while let Some(next) = bytes.next() {
+        for next in bytes.by_ref() {
             if (b'0'..=b'9').contains(&next) && index < buf.len() {
                 buf[index] = next - b'0';
             } else if next == b'm' {
@@ -150,8 +150,8 @@ impl Writer {
             } else {
                 // next is not numeric || index == buf.len() && next != ';'
                 self.write_byte(b'[');
-                for i in 0..index {
-                    self.write_byte(buf[i] + b'0');
+                for i in buf.iter().take(index) {
+                    self.write_byte(i + b'0');
                 }
                 self.write_byte(next);
                 return;
@@ -161,8 +161,8 @@ impl Writer {
 
         if !valid {
             self.write_byte(b'[');
-            for i in 0..index {
-                self.write_byte(buf[i] + b'0');
+            for i in buf.iter().take(index) {
+                self.write_byte(i + b'0');
             }
             return;
         }
@@ -231,7 +231,7 @@ impl Writer {
 
 impl Write for Writer {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        let mut bytes = s.bytes().into_iter();
+        let mut bytes = s.bytes();
         while let Some(byte) = bytes.next() {
             match byte {
                 0x1b => {
@@ -260,7 +260,9 @@ macro_rules! println {
 
 #[doc(hidden)]
 pub fn _print(args: Arguments) {
-    WRITER.lock().write_fmt(args).unwrap();
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        WRITER.lock().write_fmt(args).unwrap();
+    });
 }
 
 #[doc(hidden)]
