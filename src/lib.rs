@@ -2,8 +2,10 @@
 #![no_main]
 #![feature(abi_x86_interrupt)]
 #![feature(custom_test_frameworks)]
+#![feature(alloc_error_handler)]
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
+
 
 pub mod ports;
 pub mod serial;
@@ -14,7 +16,10 @@ pub mod interrupts;
 pub mod pic;
 pub mod utils;
 pub mod layouts;
-pub mod segmentation;
+pub mod memory;
+pub mod allocator;
+
+extern crate alloc;
 
 /// initializes the kernel
 pub fn init() {
@@ -55,6 +60,11 @@ pub fn hlt_loop() -> ! {
     loop {
         x86_64::instructions::hlt();
     }
+}
+
+#[alloc_error_handler]
+fn alloc_error_handler(layout: alloc::alloc::Layout) -> ! {
+    panic!("allocation error {layout:#?}");
 }
 
 pub trait Testable {

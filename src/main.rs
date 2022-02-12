@@ -11,8 +11,13 @@ fn trivial_assertion() {
     assert_eq!(1, 1);
 }
 
+extern crate alloc;
+
+use alloc::boxed::Box;
+use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
-use os::{eprintln, hlt_loop, println, serial_println};
+use os::{eprintln, hlt_loop, memory::{self, BootInfoFrameAllocator}, println, serial_println, allocator};
+use x86_64::VirtAddr;
 
 // use crate::ports::tst;
 #[panic_handler]
@@ -23,8 +28,9 @@ fn panic(info: &PanicInfo) -> ! {
     /* unrecoverable panic attack */
 }
 
-#[no_mangle]
-pub extern "C" fn _start() -> ! {
+entry_point!(kernel_main);
+
+fn kernel_main(boot_info: &'static BootInfo) -> ! {
     // init
     os::init();
 
@@ -47,10 +53,20 @@ pub extern "C" fn _start() -> ! {
 
     // port_byte_out(port, b'h');
 
-    os::color_test();
-    // println!("still alive");
+    //os::color_test();
+    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
+    let mut mapper = unsafe { memory::init(phys_mem_offset) };
+    let mut frame_allocator = unsafe {
+        BootInfoFrameAllocator::new(&boot_info.memory_map)
+    };
 
+    allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed lol");
+
+
+
+    println!("ait");
     // video_tmp()
+    let x = Box::new(12);
 
     hlt_loop();
 }
