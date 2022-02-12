@@ -1,4 +1,4 @@
-use pc_keyboard::{DecodedKey, HandleControl, KeyCode, KeyboardLayout};
+use pc_keyboard::{DecodedKey, KeyCode, KeyboardLayout};
 
 use crate::print;
 
@@ -8,7 +8,7 @@ impl KeyboardLayout for DeCh {
     fn map_keycode(
         keycode: pc_keyboard::KeyCode,
         modifiers: &pc_keyboard::Modifiers,
-        handle_ctrl: pc_keyboard::HandleControl,
+        _handle_ctrl: pc_keyboard::HandleControl,
     ) -> pc_keyboard::DecodedKey {
         match keycode {
             KeyCode::Escape => DecodedKey::Unicode(0x1B.into()),
@@ -298,12 +298,10 @@ impl KeyboardLayout for DeCh {
                     } else {
                         DecodedKey::Unicode('>')
                     }
+                } else if modifiers.alt_gr {
+                    DecodedKey::Unicode('\u{2264}')
                 } else {
-                    if modifiers.alt_gr {
-                        DecodedKey::Unicode('\u{2264}')
-                    } else {
-                        DecodedKey::Unicode('<')
-                    }
+                    DecodedKey::Unicode('<')
                 }
             }
             KeyCode::Fullstop => {
